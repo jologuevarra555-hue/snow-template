@@ -445,7 +445,7 @@ body{padding-bottom:72px}
   </div>
 </section>
 
-  <div class="verstamp">Template version 25 Nov 2026 · build 63</div>
+  <div class="verstamp">Template version 25 Nov 2026 · build 64</div>
 </main>
 <div id="resmodal" class="modal" aria-hidden="true"><div class="mbox" role="dialog" aria-label="Residential Ticket Due Date">
   <div class="mhead"><b>Residential Ticket Due Date</b><button class="ghost" id="resclose" aria-label="Close">✕</button></div>
@@ -2210,7 +2210,7 @@ document.getElementById('mvclose').addEventListener('click',closeMapView);
 /* ---------- Google Drive link (open + save back) ---------- */
 const GOOGLE_DEFAULT={clientId:'426117566953-q0t47kttrtbfob454shr542d60inr8k8.apps.googleusercontent.com',apiKey:'AIzaSyDZ8d6UYx2bwFCSOgMOkl72cg9CRNGBokk'};
 const XLSX_MIME='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-let gTok='',gTokExp=0,gTokFull=false,gSyncT=0,gLoaded=false,gLoadP=null,gMsg='',gBusy=false,dBusy=false,dMsg='';
+let gTok='',gTokExp=0,gTokFull=false,gSyncT=0,gLoaded=false,gLoadP=null,gMsg='',gBusy=false,dBusy=false,dMsg='',nMsg='',nBusy=false;
 const gId=()=>GOOGLE_DEFAULT.clientId||mapData.gClientId||'';
 const gReady=()=>!!gId();
 const G_FILE='Snow File Map.xlsx';
@@ -2748,7 +2748,7 @@ pdfM.addEventListener('click',e=>{
 
 /* ---------- Floating notes: SIO / Officer / Patrol, synced as their own Drive file ---------- */
 const N_FILE='Snow Notes.json';
-let nAlts={},nWatch=0,nMsg='',nBusy=false,nTab='',nOpen='',nScope='file',nDelArm='',nSaveT=0,nLocMsg='';
+let nAlts={},nWatch=0,nTab='',nOpen='',nScope='file',nDelArm='',nSaveT=0,nLocMsg='';
 const NT=()=>{if(!store.notes||!Array.isArray(store.notes.items))store.notes={items:[],deleted:{}};if(!store.notes.deleted)store.notes.deleted={};return store.notes;};
 const nPad=v=>String(v).padStart(2,'0');
 const NTYPES=[['sio','SIO Notes'],['officer','Officer Notes'],['patrol','Patrol Notes']];
