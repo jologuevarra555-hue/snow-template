@@ -468,7 +468,7 @@ body{padding-bottom:72px}
   </div>
 </section>
 
-  <div class="verstamp">Template version 25 Nov 2026 · build 68</div>
+  <div class="verstamp">Template version 25 Nov 2026 · build 69</div>
 </main>
 <div id="resmodal" class="modal" aria-hidden="true"><div class="mbox" role="dialog" aria-label="Residential Ticket Due Date">
   <div class="mhead"><b>Residential Ticket Due Date</b><button class="ghost" id="resclose" aria-label="Close">✕</button></div>
@@ -2808,15 +2808,21 @@ const nTm=x=>x.type!=='sio';
 const nRange=x=>'('+nHMc(x.created)+')'+(x.endedAt?' – ('+nHMc(x.endedAt)+')':'');
 const nDist=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r,h=Math.sin(x/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h));};
 const nTitle=st=>String(st||'').toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase()).replace(/\b(Nw|Ne|Sw|Se)\b/g,m=>m.toUpperCase());
+let nAltsHide={};
 function nAltsHtml(id){
-  const l=nAlts[id]||[];if(l.length<2)return '';
-  return '<div class="muted" style="font-size:11.5px;width:100%">Nearby addresses, tap the right one:</div>'+l.map((o,i)=>`<button type="button" data-nalt="${i}">${esc(o.a)}${o.d==null?'':' · '+Math.round(o.d)+' m'}</button>`).join('');
+  const l=nAlts[id]||[];if(!l.length)return '';
+  const x=nFind(id);
+  if(nAltsHide[id])return `<button type="button" data-naltshow="1" style="border-color:transparent;text-decoration:underline">✓ Address confirmed · show nearby</button>`;
+  let h='';
+  if(l.length>1)h+='<div class="muted" style="font-size:11.5px;width:100%">Nearby addresses, tap the right one:</div>'+l.map((o,i)=>`<button type="button" data-nalt="${i}"${x&&x.loc===o.a?' class="pri"':''}>${esc(o.a)}${o.d==null?'':' · '+Math.round(o.d)+' m'}</button>`).join('');
+  return h+`<button type="button" class="pri" data-nconfirm="1" style="width:100%">✓ This address is correct</button>`;
 }
+function nAltsRefresh(id){const e=document.getElementById('nalts');if(e&&nOpen===id)e.innerHTML=nAltsHtml(id);}
 function nLocate(it){
   const ui=m=>{nLocMsg=m;const e=document.getElementById('nlocmsg');if(e)e.textContent=m;};
   if(!navigator.geolocation){ui('This browser cannot find your location. Type the address.');return;}
   if(nWatch){try{navigator.geolocation.clearWatch(nWatch);}catch(e){}nWatch=0;}
-  nAlts[it.id]=[];{const e=document.getElementById('nalts');if(e)e.innerHTML='';}
+  nAlts[it.id]=[];nAltsHide[it.id]=false;{const e=document.getElementById('nalts');if(e)e.innerHTML='';}
   ui('📍 Finding your location…');
   let best=null,fin=false,tm=0;
   const stop=()=>{if(nWatch){try{navigator.geolocation.clearWatch(nWatch);}catch(e){}nWatch=0;}clearTimeout(tm);};
@@ -3033,7 +3039,9 @@ document.addEventListener('click',e=>{
     const x=nFind(nOpen);if(!x||!nUndo||nUndo.id!==x.id)return;
     x.blocks=JSON.parse(nUndo.snap);x.text=x.blocks.map(k=>k.text).join('\n\n');x.endedAt=x.blocks[x.blocks.length-1].end||0;x.updated=Date.now();nUndo=null;clearTimeout(nUndoT);nSave(true);nRender();return;
   }
-  if((b=t.closest('[data-nalt]'))){const x=nFind(nOpen),o=x&&(nAlts[nOpen]||[])[+b.dataset.nalt];if(o){x.loc=o.a;x.updated=Date.now();nSave(true);const i=document.getElementById('nloc');if(i)i.value=o.a;}return;}
+  if((b=t.closest('[data-nalt]'))){const x=nFind(nOpen),o=x&&(nAlts[nOpen]||[])[+b.dataset.nalt];if(o){x.loc=o.a;x.updated=Date.now();nSave(true);const i=document.getElementById('nloc');if(i)i.value=o.a;nAltsHide[nOpen]=true;nAltsRefresh(nOpen);}return;}
+  if(t.closest('[data-nconfirm]')){nAltsHide[nOpen]=true;nAltsRefresh(nOpen);return;}
+  if(t.closest('[data-naltshow]')){nAltsHide[nOpen]=false;nAltsRefresh(nOpen);return;}
   if(t.closest('[data-nloc]')){const x=nFind(nOpen);if(x)nLocate(x);return;}
   if(t.closest('[data-nfaddr]')){const x=nFind(nOpen);if(x){x.loc=(state.address||'').trim();x.fileId=cur.id;x.updated=Date.now();nSave(true);const i=document.getElementById('nloc');if(i)i.value=x.loc;}return;}
   if(t.closest('[data-ncopy]')){
