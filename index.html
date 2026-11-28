@@ -468,7 +468,7 @@ body{padding-bottom:72px}
   </div>
 </section>
 
-  <div class="verstamp">Template version 25 Nov 2026 · build 70</div>
+  <div class="verstamp">Template version 25 Nov 2026 · build 71</div>
 </main>
 <div id="resmodal" class="modal" aria-hidden="true"><div class="mbox" role="dialog" aria-label="Residential Ticket Due Date">
   <div class="mhead"><b>Residential Ticket Due Date</b><button class="ghost" id="resclose" aria-label="Close">✕</button></div>
@@ -2771,7 +2771,7 @@ pdfM.addEventListener('click',e=>{
 
 /* ---------- Floating notes: SIO / Officer / Patrol, synced as their own Drive file ---------- */
 const N_FILE='Snow Notes.json';
-let nAlts={},nWatch=0,nTab='',nOpen='',nScope='file',nDelArm='',nSaveT=0,nLocMsg='';
+let nGoMsg={},nAlts={},nWatch=0,nTab='',nOpen='',nScope='file',nDelArm='',nSaveT=0,nLocMsg='';
 const NT=()=>{if(!store.notes||!Array.isArray(store.notes.items))store.notes={items:[],deleted:{}};if(!store.notes.deleted)store.notes.deleted={};return store.notes;};
 const nPad=v=>String(v).padStart(2,'0');
 const NTYPES=[['sio','SIO Notes'],['officer','Officer Notes'],['patrol','Patrol Notes']];
@@ -2818,6 +2818,31 @@ function nAltsHtml(id){
   return h+`<button type="button" class="pri" data-nconfirm="1" style="width:100%">✓ This address is correct</button>`;
 }
 function nAltsRefresh(id){const e=document.getElementById('nalts');if(e&&nOpen===id)e.innerHTML=nAltsHtml(id);}
+function nFileOf(x){
+  let f=x.fileId&&store.files.find(q=>q.id===x.fileId);
+  if(!f&&x.loc){const n=mapNorm(x.loc);f=store.files.find(q=>mapNorm(((q===cur?state:q.state)||{}).address)===n);}
+  return f||null;
+}
+function nGoFile(x){
+  const f=nFileOf(x);if(!f)return false;
+  if(isClosed(f))reopenFile(f.id);else if(f!==cur)switchTo(f.id);
+  x.fileId=f.id;
+  nGoMsg[x.id]='📂 Opened file: '+(((f===cur?state:f.state)||{}).address||'(no address)');
+  return true;
+}
+function nToOfficer(x){
+  const addr=(x.loc||'').trim();
+  if(!addr){nLocMsg='Add the address first, then move it to Officer Notes.';const e=document.getElementById('nlocmsg');if(e)e.textContent=nLocMsg;return;}
+  const n=mapNorm(addr);
+  let f=store.files.find(q=>mapNorm(((q===cur?state:q.state)||{}).address)===n),made=false;
+  if(f){if(isClosed(f))reopenFile(f.id);else if(f!==cur)switchTo(f.id);}
+  else{newFile();f=cur;state.address=addr;made=true;syncInputs();update();save();}
+  const fa=String(((f===cur?state:f.state)||{}).address||'').trim()||addr;
+  x.type='officer';x.fileId=f.id;x.loc=fa;x.updated=Date.now();
+  nTab='officer';NT().tab='officer';
+  nGoMsg[x.id]=(made?'📂 New file created: ':'📂 Added to existing file: ')+fa;
+  nSave(true);nRender();
+}
 let nFix=null,nWarmW=0,nAutoLoc={},nEdCache={};
 function nWarm(){
   if(!navigator.geolocation||nWarmW)return;
@@ -2917,6 +2942,7 @@ function nRender(){
     if(x.type==='sio')h+=`<input type="text" id="ntitle" data-nf="title" placeholder="Title (e.g. Cheat sheet)" value="${esc(x.title)}" autocomplete="off"><div class="nm muted" style="font-size:11.5px;margin-top:4px">Last edited ${esc(nDay(x.updated))}</div>`;
     else{
       h+=`<div class="muted" id="nhead" style="font-size:12px;font-weight:600">${esc(nHead(x))}</div>`;
+      if(nGoMsg[x.id])h+=`<div class="muted" style="font-size:11.5px;margin-top:2px">${esc(nGoMsg[x.id])}</div>`;
       h+=`<input type="text" id="nloc" data-nf="loc" placeholder="${x.type==='patrol'?'Your location (address)':'File address'}" value="${esc(x.loc)}" autocomplete="off">`;
       if(x.type==='patrol')h+=`<div class="muted" id="nlocmsg" style="font-size:11.5px;margin-top:3px">${esc(nLocMsg)}</div><div class="nbar" id="nalts" style="margin-top:4px">${nAltsHtml(x.id)}</div>`;
     }
@@ -2931,7 +2957,7 @@ function nRender(){
       if(nUndo&&nUndo.id===x.id)h+=`<div class="nundo" id="nundo">Box deleted <button type="button" data-nundo="1">Undo</button></div>`;
     }else h+=`<textarea id="ntext" data-nf="text" placeholder="Type your note…" style="margin-top:2px">${esc(x.text)}</textarea>`;
     h+=`<div class="nbar"><button type="button" data-nback="1">‹ Back</button><button type="button" class="pri" data-ncopy="1">📋 Copy</button>`;
-    if(x.type==='patrol')h+=`<button type="button" data-nloc="1">📍 Update location</button>`;
+    if(x.type==='patrol')h+=`<button type="button" data-nloc="1">📍 Update location</button><button type="button" data-ntooff="1">➡ Move to Officer Notes</button>`;
     if(x.type==='officer')h+=`<button type="button" data-nfaddr="1">↻ File address</button>`;
     h+=`<button type="button" class="del${nDelArm===x.id?' arm':''}" data-ndel="1">${nDelArm===x.id?'Tap again to delete':'🗑'}</button></div>`;
   }else{
@@ -3048,8 +3074,13 @@ document.addEventListener('click',e=>{
   if(t.closest('[data-nclose]')){nToggle(false);return;}
   if((b=t.closest('[data-ntab]'))){nTab=b.dataset.ntab;if(nTab==='patrol')nWarm();NT().tab=nTab;nOpen='';nDelArm='';nSave(true);nRender();return;}
   if(t.closest('[data-nnew]')){nNew(nTab);return;}
-  if((b=t.closest('[data-nopen]'))){nOpen=b.dataset.nopen;nDelArm='';nLocMsg='';nRender();return;}
-  if(t.closest('[data-nback]')){nOpen='';nDelArm='';nRender();return;}
+  if((b=t.closest('[data-nopen]'))){
+    nOpen=b.dataset.nopen;nDelArm='';nLocMsg='';
+    const x=nFind(nOpen);if(x&&x.type==='officer'&&(!x.fileId||x.fileId!==cur.id))nGoFile(x);
+    nRender();return;
+  }
+  if(t.closest('[data-ntooff]')){const x=nFind(nOpen);if(x)nToOfficer(x);return;}
+  if(t.closest('[data-nback]')){nGoMsg={};nOpen='';nDelArm='';nRender();return;}
   if(t.closest('[data-nscope]')){nScope=nScope==='file'?'all':'file';nRender();return;}
   if(t.closest('[data-nbadd]')){
     const x=nFind(nOpen);if(!x)return;const bl=nBlocks(x);bl.push({text:'',start:Date.now(),end:0});x.updated=Date.now();nBArm=-1;nSave(true);nRender();
