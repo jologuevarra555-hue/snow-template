@@ -468,7 +468,7 @@ body{padding-bottom:72px}
   </div>
 </section>
 
-  <div class="verstamp">Template version 25 Nov 2026 · build 69</div>
+  <div class="verstamp">Template version 25 Nov 2026 · build 70</div>
 </main>
 <div id="resmodal" class="modal" aria-hidden="true"><div class="mbox" role="dialog" aria-label="Residential Ticket Due Date">
   <div class="mhead"><b>Residential Ticket Due Date</b><button class="ghost" id="resclose" aria-label="Close">✕</button></div>
@@ -2818,27 +2818,47 @@ function nAltsHtml(id){
   return h+`<button type="button" class="pri" data-nconfirm="1" style="width:100%">✓ This address is correct</button>`;
 }
 function nAltsRefresh(id){const e=document.getElementById('nalts');if(e&&nOpen===id)e.innerHTML=nAltsHtml(id);}
+let nFix=null,nWarmW=0,nAutoLoc={},nEdCache={};
+function nWarm(){
+  if(!navigator.geolocation||nWarmW)return;
+  try{
+    nWarmW=navigator.geolocation.watchPosition(pos=>{nFix={la:pos.coords.latitude,lo:pos.coords.longitude,acc:Math.round(pos.coords.accuracy||0),t:Date.now()};},()=>{},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
+    setTimeout(()=>{try{navigator.geolocation.clearWatch(nWarmW);}catch(e){}nWarmW=0;},25000);
+  }catch(e){}
+}
 function nLocate(it){
   const ui=m=>{nLocMsg=m;const e=document.getElementById('nlocmsg');if(e)e.textContent=m;};
   if(!navigator.geolocation){ui('This browser cannot find your location. Type the address.');return;}
   if(nWatch){try{navigator.geolocation.clearWatch(nWatch);}catch(e){}nWatch=0;}
+  {const x0=nFind(it.id);nAutoLoc[it.id]=x0?x0.loc:'';}
   nAlts[it.id]=[];nAltsHide[it.id]=false;{const e=document.getElementById('nalts');if(e)e.innerHTML='';}
   ui('📍 Finding your location…');
-  let best=null,fin=false,tm=0;
+  let bestAcc=1e9,resolvedAcc=1e9,fin=false,tm=0,seq=0,lastMsg='';
   const stop=()=>{if(nWatch){try{navigator.geolocation.clearWatch(nWatch);}catch(e){}nWatch=0;}clearTimeout(tm);};
-  const finish=async()=>{if(fin)return;fin=true;stop();if(best)await nResolve(it,best,ui);else ui('Could not get your location. Tap 📍 to try again or type the address.');};
+  const useFix=async(la,lo,acc)=>{
+    if(!(resolvedAcc===1e9||acc<resolvedAcc*0.75))return;
+    resolvedAcc=acc;const my=++seq;
+    const m=await nResolve(it,la,lo,acc,()=>my===seq,()=>!fin);
+    if(m&&my===seq)lastMsg=m;
+  };
+  const finish=()=>{
+    if(fin)return;fin=true;stop();
+    if(bestAcc===1e9){ui('Could not get your location. Tap 📍 to try again or type the address.');return;}
+    if(lastMsg)ui(lastMsg);
+  };
+  if(nFix&&Date.now()-nFix.t<30000){bestAcc=nFix.acc;useFix(nFix.la,nFix.lo,nFix.acc);}
   nWatch=navigator.geolocation.watchPosition(pos=>{
-    if(fin)return;if(!best||pos.coords.accuracy<best.coords.accuracy)best=pos;
-    const a=Math.round(best.coords.accuracy||0);ui('📍 Improving GPS… ±'+a+' m');
-    if(a<=8)finish();
+    if(fin)return;const a=Math.round(pos.coords.accuracy||0);
+    nFix={la:pos.coords.latitude,lo:pos.coords.longitude,acc:a,t:Date.now()};
+    if(a<bestAcc){bestAcc=a;useFix(pos.coords.latitude,pos.coords.longitude,a);}
+    if(a<=12)setTimeout(finish,250);
   },err=>{
-    if(fin)return;if(best){finish();return;}fin=true;stop();
+    if(fin)return;if(bestAcc<1e9){finish();return;}fin=true;stop();
     ui(err&&err.code===1?'Location is blocked. In Safari tap aA → Website Settings → Location → Allow, then tap 📍 again. You can also type the address.':'Could not get your location. Tap 📍 to try again or type the address.');
-  },{enableHighAccuracy:true,timeout:20000,maximumAge:0});
-  tm=setTimeout(finish,12000);
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:5000});
+  tm=setTimeout(finish,7000);
 }
-async function nResolve(it,pos,ui){
-  const la=pos.coords.latitude,lo=pos.coords.longitude,acc=Math.round(pos.coords.accuracy||0);
+async function nResolve(it,la,lo,acc,fresh,improving){
   let alts=[];
   try{
     const rad=Math.min(150,Math.max(50,acc*2));
@@ -2859,10 +2879,15 @@ async function nResolve(it,pos,ui){
     }catch(e){}
   }
   if(!alts.length)alts=[{a:la.toFixed(5)+', '+lo.toFixed(5),d:null}];
-  nAlts[it.id]=alts;
-  const x=nFind(it.id);if(x){x.loc=alts[0].a;x.updated=Date.now();nSave(true);}
-  if(nOpen===it.id){const inp=document.getElementById('nloc');if(inp)inp.value=alts[0].a;const e=document.getElementById('nalts');if(e)e.innerHTML=nAltsHtml(it.id);}
-  ui('📍 GPS fix'+(acc?' · about ±'+acc+' m':'')+(alts.length>1?'. Closest address filled in. If it is the building next door, tap the right one below.':'. Check the address, you can edit it.'));
+  if(!fresh())return '';
+  const msg='📍 GPS fix'+(acc?' · about ±'+acc+' m':'')+(alts.length>1?'. Closest address filled in. If it is the building next door, tap the right one below.':'. Check the address, you can edit it.');
+  const x=nFind(it.id);
+  if(x&&!nAltsHide[it.id]&&(!x.loc||x.loc===nAutoLoc[it.id])){
+    nAlts[it.id]=alts;x.loc=alts[0].a;nAutoLoc[it.id]=x.loc;x.updated=Date.now();nSave(true);
+    if(nOpen===it.id){const inp=document.getElementById('nloc');if(inp)inp.value=x.loc;nAltsRefresh(it.id);}
+  }else if(x){nAlts[it.id]=alts;}
+  nLocMsg=msg+(improving()?' Improving…':'');const e=document.getElementById('nlocmsg');if(e)e.textContent=nLocMsg;
+  return msg;
 }
 const nDay=t=>{const d=new Date(t||0);return d.toLocaleDateString('en-CA',{month:'short',day:'numeric'})+' '+nPad(d.getHours())+nPad(d.getMinutes());};
 function nStatText(){
@@ -2938,7 +2963,7 @@ function nToggle(open){
   const pop=document.getElementById('npop');
   const on=open===undefined?!pop.classList.contains('show'):open;
   pop.classList.toggle('show',on);pop.setAttribute('aria-hidden',on?'false':'true');
-  if(on){nRender();if(mapData.notes&&gTok&&Date.now()<gTokExp-30000)syncNotes(false);}
+  if(on){nRender();if((nTab||NT().tab)==='patrol')nWarm();if(mapData.notes&&gTok&&Date.now()<gTokExp-30000)syncNotes(false);}
 }
 /* --- Drive file for notes --- */
 const notesKeyOf=(items,del)=>fh(JSON.stringify([items.map(i=>[i.id,i.updated||0]).sort(),Object.keys(del||{}).sort()]));
@@ -3021,7 +3046,7 @@ document.addEventListener('click',e=>{
   const pop=document.getElementById('npop');if(!pop.contains(t))return;
   let b;
   if(t.closest('[data-nclose]')){nToggle(false);return;}
-  if((b=t.closest('[data-ntab]'))){nTab=b.dataset.ntab;NT().tab=nTab;nOpen='';nDelArm='';nSave(true);nRender();return;}
+  if((b=t.closest('[data-ntab]'))){nTab=b.dataset.ntab;if(nTab==='patrol')nWarm();NT().tab=nTab;nOpen='';nDelArm='';nSave(true);nRender();return;}
   if(t.closest('[data-nnew]')){nNew(nTab);return;}
   if((b=t.closest('[data-nopen]'))){nOpen=b.dataset.nopen;nDelArm='';nLocMsg='';nRender();return;}
   if(t.closest('[data-nback]')){nOpen='';nDelArm='';nRender();return;}
