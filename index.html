@@ -318,7 +318,7 @@ body{padding-bottom:72px}
 #nstat{padding:5px 10px;border-top:1px solid var(--line);font-size:11.5px;color:var(--mute);display:flex;justify-content:space-between;gap:8px;align-items:center}
 #nstat button{border:0;background:none;color:var(--acc);font-weight:600;font-size:11.5px;padding:0}
 .ntime{font-size:11px;color:var(--mute);opacity:.7;line-height:1.2;margin-top:6px;min-height:13px}.ntime.end{text-align:right;margin:2px 2px 0}
-.nbk{min-height:90px!important}.nadd{display:block;margin:8px auto 0;width:48px;min-height:34px;border:1px dashed var(--acc);border-radius:999px;background:transparent;color:var(--acc);font-size:20px;line-height:1;padding:0}.nbx{border:0;background:none;color:var(--mute);opacity:.7;font-size:11px;padding:0 2px;min-height:0}.nbx.arm{color:#c0392b;opacity:1;font-weight:700}
+.nbk{min-height:90px!important}.nadd{display:block;margin:8px auto 0;width:48px;min-height:34px;border:1px dashed var(--acc);border-radius:999px;background:transparent;color:var(--acc);font-size:20px;line-height:1;padding:0}.nbx{border:0;background:none;color:var(--mute);opacity:.75;font-size:13px;padding:4px 6px;min-height:0}.nbx.arm{color:#c0392b;opacity:1;font-weight:700}
 
 /* ---- notes: light burgundy pink look so it stands apart from the app ---- */
 #npop{background:#3b1824;border-color:#d9708a;color:#fbeaee;box-shadow:0 12px 36px rgba(0,0,0,.6),0 0 0 1px #d9708a55}
@@ -465,7 +465,7 @@ body{padding-bottom:72px}
   </div>
 </section>
 
-  <div class="verstamp">Template version 25 Nov 2026 · build 66</div>
+  <div class="verstamp">Template version 25 Nov 2026 · build 67</div>
 </main>
 <div id="resmodal" class="modal" aria-hidden="true"><div class="mbox" role="dialog" aria-label="Residential Ticket Due Date">
   <div class="mhead"><b>Residential Ticket Due Date</b><button class="ghost" id="resclose" aria-label="Close">✕</button></div>
@@ -2882,7 +2882,7 @@ function nRender(){
     }
     if(nTm(x)){
       nBlocks(x).forEach((bk,i)=>{
-        h+=`<div class="ntime" style="display:flex;justify-content:space-between;align-items:center"><span>(${nHMc(bk.start)})</span>${i?`<button type="button" class="nbx${nBArm===i?' arm':''}" data-nbdel="${i}" aria-label="Remove this box">${nBArm===i?'Tap again to remove':'✕'}</button>`:''}</div>`;
+        h+=`<div class="ntime" style="display:flex;justify-content:space-between;align-items:center"><span>(${nHMc(bk.start)})</span><button type="button" class="nbx${nBArm===i?' arm':''}" data-nbdel="${i}" aria-label="Delete this box">${nBArm===i?'Tap again to delete':'🗑 ✕'}</button></div>`;
         h+=`<textarea ${i?`id="ntext${i}"`:'id="ntext"'} data-nb="${i}" class="nbk" placeholder="${i?'Next point…':'Type your note…'}" style="margin-top:2px">${esc(bk.text)}</textarea>`;
         h+=`<div class="ntime end" id="nend${i}">${bk.end?'('+nHMc(bk.end)+')':''}</div>`;
       });
@@ -3016,7 +3016,8 @@ document.addEventListener('click',e=>{
   if((b=t.closest('[data-nbdel]'))){
     const x=nFind(nOpen);if(!x)return;const i=+b.dataset.nbdel,bl=nBlocks(x);if(!bl[i])return;
     if(bl[i].text.trim()&&nBArm!==i){nBArm=i;nRender();return;}
-    bl.splice(i,1);nBArm=-1;x.text=bl.map(k=>k.text).join('\n\n');x.updated=Date.now();nSave(true);nRender();return;
+    if(bl.length===1)bl[0]={text:'',start:Date.now(),end:0};else bl.splice(i,1);
+    nBArm=-1;x.text=bl.map(k=>k.text).join('\n\n');x.endedAt=bl[bl.length-1].end||0;x.updated=Date.now();nSave(true);nRender();return;
   }
   if((b=t.closest('[data-nalt]'))){const x=nFind(nOpen),o=x&&(nAlts[nOpen]||[])[+b.dataset.nalt];if(o){x.loc=o.a;x.updated=Date.now();nSave(true);const i=document.getElementById('nloc');if(i)i.value=o.a;}return;}
   if(t.closest('[data-nloc]')){const x=nFind(nOpen);if(x)nLocate(x);return;}
